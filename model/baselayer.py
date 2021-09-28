@@ -6,9 +6,9 @@ def scaled_dot_product_attention(q, k, v, mask):
     """ 
     calculate self-attention
     ----------------
-    q: (..., seq_len_q, depth)
-    k: (..., seq_len_k, depth)
-    v: (..., seq_len_v, depth)
+    q: (batch_size, seq_len_q, depth)
+    k: (batch_size, seq_len_k, depth)
+    v: (batch_size, seq_len_v, depth)
     """
     matmul_qk = tf.matmul(q, k, transpose_b=True)
 
@@ -72,24 +72,33 @@ class MultiHeadAttention(tf.keras.layers.Layer):
 
 
 class PointWiseFFN(tf.keras.layers.Layer):
-    def __init__(self, d_model, dff, **kwargs):
+    def __init__(self, d_model, hidden_dim, dropout=0., **kwargs):
         super(PointWiseFFN, self).__init__(**kwargs)
 
-        self.dense1 = tf.keras.layers.Dense(dff, activation='relu')
+        self.dense1 = tf.keras.layers.Dense(hidden_dim, activation='gelu')
+        self.dropout1 = tf.keras.layers.Dropout(dropout)
         self.dense2 = tf.keras.layers.Dense(d_model)
+        self.dropout2 = tf.keras.layers.Dropout(dropout)
 
     def call(self, x):
         x = self.dense1(x)
+        x = self.dropout1(x)
         x = self.dense2(x)
+        x = self.dropout2(x)
         return x
 
 
 class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, dff, dropout=0.1, **kwargs):
+    def __init__(self, d_model, num_heads, hidden_dim, dropout=0.1, **kwargs):
+        """
+        Construct Encoder Block:
+            one Multi-head Attention
+            one FeedForward with gelu non-linear
+        """
         super(EncoderLayer, self).__init__(**kwargs)
 
         self.mha = MultiHeadAttention(d_model, num_heads)
-        self.ffn = PointWiseFFN(d_model, dff)
+        self.ffn = PointWiseFFN(d_model, hidden_dim)
 
         self.norm1 = tf.keras.layers.LayerNormalization()
         self.norm2 = tf.keras.layers.LayerNormalization()
@@ -110,13 +119,18 @@ class EncoderLayer(tf.keras.layers.Layer):
 
 
 class DecoderLayer(tf.keras.layers.Layer):
-    def __init__(self, d_model, num_heads, dff, dropout=0.1, **kwargs):
+    def __init__(self, d_model, num_heads, hidden_dim, dropout=0.1, **kwargs):
+        """
+        Construct Decoder Block
+            two Multi-head Attention
+            one FeedForward with gelu non-linear
+        """
         super(DecoderLayer, self).__init__(**kwargs)
 
         self.mha1 = MultiHeadAttention(d_model, num_heads)
         self.mha2 = MultiHeadAttention(d_model, num_heads)
 
-        self.ffn = PointWiseFFN(d_model, dff)
+        self.ffn = PointWiseFFN(d_model, hidden_dim)
 
         self.norm1 = tf.keras.layers.LayerNormalization()
         self.norm2 = tf.keras.layers.LayerNormalization()

@@ -48,11 +48,15 @@ class Decoder(tf.keras.layers.Layer):
         self.dropout = tf.keras.layers.Dropout(dropout_rate)
 
     def call(self, x):
+        attention_weights = {}
         x = self.embedding(x)
         x *= tf.math.sqrt(tf.cast(self.d_model, tf.float32))
 
         x = self.dropout(x)
 
         for i in range(self.num_layers):
-            x = self.dec_layers[i](x)
-        return x
+            x, block_1, block_2 = self.dec_layers[i](x)
+            attention_weights['decoder_layer{}_block1'.format(i+1)] = block_1
+            attention_weights['decoder_layer{}_block2'.format(i+1)] = block_2
+
+        return x, attention_weights
